@@ -16,11 +16,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-app = FastAPI()
+app = FastAPI(
+    title="Kokoro TTS API",
+    description="API de synthèse vocale utilisant Kokoro",
+    version="1.0.0"
+)
 
-# Autoriser le frontend Vercel
+# Autoriser le frontend et les domaines de déploiement
 origins = [
-    "https://tts-programme.vercel.app",  # remplace par ton vrai domaine Vercel
+    "https://tts-programme.vercel.app",
+    "https://tts-programme.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
@@ -34,6 +39,27 @@ app.add_middleware(
 
 # Servir les fichiers générés
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
+
+
+@app.get("/")
+async def root():
+    """Route racine - Informations sur l'API"""
+    return {
+        "message": "Kokoro TTS API",
+        "status": "running",
+        "version": "1.0.0",
+        "endpoints": {
+            "docs": "/docs",
+            "tts": "/tts (POST)",
+            "health": "/health"
+        }
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """Route de santé pour les vérifications de disponibilité"""
+    return {"status": "healthy", "service": "kokoro-tts-api"}
 
 
 class TTSRequest(BaseModel):
