@@ -26,8 +26,10 @@ app = FastAPI(
 origins = [
     "https://tts-programme.vercel.app",
     "https://tts-programme.onrender.com",
-    "http://localhost:5173",
+    "http://localhost:5173",  # Vite dev server
+    "http://localhost:4173",  # Vite preview server
     "http://127.0.0.1:5173",
+    "http://127.0.0.1:4173",
 ]
 app.add_middleware(
     CORSMiddleware,
