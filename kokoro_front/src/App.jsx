@@ -21,12 +21,12 @@ export default function App() {
 
     try {
       const response = await axios.post(
-        'http://127.0.0.1:8000/tts',
+        'https://tts-programme.onrender.com/tts',
         { text: trimmed },
         { timeout: 150000 } // 150 secondes (2.5 minutes) pour laisser le temps à la génération
       );
       const filename = response.data.audio_file;
-      setAudioUrl(`http://127.0.0.1:8000${filename}`);
+      setAudioUrl(`https://tts-programme.onrender.com/${filename}`);
     } catch (err) {
       console.error('Erreur lors de la génération de la synthèse vocale:', err);
       if (err.response?.status === 504) {
