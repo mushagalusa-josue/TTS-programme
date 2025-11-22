@@ -24,10 +24,12 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # 8. Passer à l'utilisateur non-root
 USER appuser
 
-# 9. Exposer le port (configurable via PORT env var, défaut 8000)
-EXPOSE 8000
+# 9. Exposer le port (Render utilise le port défini par la variable PORT, généralement 10000)
+EXPOSE 10000
 
 # 10. Démarrer le serveur FastAPI (port configurable via variable d'environnement PORT)
-CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Utiliser python -m uvicorn pour être sûr que le module est trouvé
+# Render définit automatiquement PORT, donc on utilise cette variable
+CMD ["sh", "-c", "python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}"]
 
 
