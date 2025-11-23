@@ -94,6 +94,35 @@ class TTSRequest(BaseModel):
 
 VOICE = "ff_siwis"
 
+@app.options("/tts")
+async def options_tts(request: Request):
+    """Handler OPTIONS explicite pour CORS"""
+    from fastapi.responses import Response
+    origin = request.headers.get("origin", "")
+    # Vérifier si l'origine est autorisée
+    allowed_origins = [
+        "https://tts-programme.vercel.app",
+        "https://tts-programme.onrender.com",
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:4173",
+    ]
+    allow_origin = origin if origin in allowed_origins else allowed_origins[0]
+    
+    logging.info(f"OPTIONS /tts from origin: {origin}, allowing: {allow_origin}")
+    
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": allow_origin,
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
+
 @app.post("/tts")
 async def generate_tts(request: TTSRequest):
     logging.info("POST /tts received - Starting TTS generation")
