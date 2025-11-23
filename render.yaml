@@ -9,6 +9,6 @@ services:
         value: 10000
       - key: PYTHON_CMD
         value: python
-    healthCheckPath: /health
+    healthCheckPath: /healthy
     plan: free
 

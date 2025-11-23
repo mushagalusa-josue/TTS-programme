@@ -64,6 +64,13 @@ async def health_check():
     return {"status": "healthy", "service": "kokoro-tts-api"}
 
 
+@app.get("/healthy")
+@app.head("/healthy")
+async def healthy_check():
+    """Route de santé alternative pour compatibilité avec Render"""
+    return {"status": "healthy", "service": "kokoro-tts-api"}
+
+
 class TTSRequest(BaseModel):
     text: constr(strip_whitespace=True, min_length=1, max_length=500)
 
