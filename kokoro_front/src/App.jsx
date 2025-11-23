@@ -19,14 +19,22 @@ export default function App() {
     setError('');
     setAudioUrl('');
 
+    // URL de l'API : utilise la variable d'environnement ou l'URL Render par défaut
+    const API_URL = import.meta.env.VITE_API_URL || 'https://tts-programme.onrender.com';
+    
+    // Debug: vérifier l'URL utilisée (visible dans la console du navigateur)
+    console.log("ENV:", import.meta.env);
+    console.log('🔗 API URL utilisée:', API_URL);
+    console.log('🌍 VITE_API_URL:', import.meta.env.VITE_API_URL);
+
     try {
       const response = await axios.post(
-        'https://tts-programme.onrender.com/tts',
+        `${API_URL}/tts`,
         { text: trimmed },
         { timeout: 150000 } // 150 secondes (2.5 minutes) pour laisser le temps à la génération
       );
       const filename = response.data.audio_file;
-      setAudioUrl(`https://tts-programme.onrender.com/${filename}`);
+      setAudioUrl(`${API_URL}/${filename}`);
     } catch (err) {
       console.error('Erreur lors de la génération de la synthèse vocale:', err);
       if (err.response?.status === 504) {
