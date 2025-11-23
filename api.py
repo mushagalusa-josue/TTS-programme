@@ -57,6 +57,36 @@ app.add_middleware(
 # Middleware de logging - ajouté après CORS
 app.add_middleware(LoggingMiddleware)
 
+# Exception handler global pour s'assurer que les headers CORS sont toujours présents
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Handler global pour s'assurer que les headers CORS sont toujours présents même en cas d'erreur"""
+    from fastapi.responses import JSONResponse
+    import traceback
+    
+    origin = request.headers.get("origin", "")
+    allowed_origins = [
+        "https://tts-programme.vercel.app",
+        "https://tts-programme.onrender.com",
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:4173",
+    ]
+    allow_origin = origin if origin in allowed_origins else allowed_origins[0]
+    
+    logging.error(f"Global exception: {str(exc)}")
+    logging.error(traceback.format_exc())
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Erreur serveur: {str(exc)[:200]}"},
+        headers={
+            "Access-Control-Allow-Origin": allow_origin,
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
+
 # Servir les fichiers générés
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
 
@@ -124,13 +154,30 @@ async def options_tts(request: Request):
     )
 
 @app.post("/tts")
-async def generate_tts(request: TTSRequest):
+async def generate_tts(request: TTSRequest, http_request: Request):
+    # Récupérer l'origine pour les headers CORS dans les erreurs
+    origin = http_request.headers.get("origin", "")
+    allowed_origins = [
+        "https://tts-programme.vercel.app",
+        "https://tts-programme.onrender.com",
+        "http://localhost:5173",
+        "http://localhost:4173",
+    ]
+    allow_origin = origin if origin in allowed_origins else allowed_origins[0]
+    
     logging.info("POST /tts received - Starting TTS generation")
     text = request.text.strip()
     logging.info(f"Text received: {text[:50]}... (length: {len(text)})")
     if not text:
         logging.warning("Empty text received")
-        raise HTTPException(status_code=400, detail="Le texte ne peut pas être vide.")
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Le texte ne peut pas être vide."},
+            headers={
+                "Access-Control-Allow-Origin": allow_origin,
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
 
     output_file = f"output_{uuid.uuid4().hex}.wav"
     output_path = os.path.join(OUTPUT_DIR, output_file)
@@ -158,26 +205,56 @@ async def generate_tts(request: TTSRequest):
 
         completed_process = await run_in_threadpool(_run)
         if not os.path.exists(output_path):
-            raise HTTPException(status_code=500, detail="Le fichier audio n'a pas été généré.")
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Le fichier audio n'a pas été généré."},
+                headers={
+                    "Access-Control-Allow-Origin": allow_origin,
+                    "Access-Control-Allow-Credentials": "true",
+                }
+            )
         logging.info(
             "TTS generated successfully: %s",
             completed_process.stdout.strip() or "No output",
         )
-        return {"audio_file": f"/outputs/{output_file}"}
+        # Retourner avec headers CORS
+        response = JSONResponse(
+            content={"audio_file": f"/outputs/{output_file}"},
+            headers={
+                "Access-Control-Allow-Origin": allow_origin,
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
+        return response
     except TimeoutExpired:
         logging.error("TTS generation timed out after 120 seconds.")
-        raise HTTPException(status_code=504, detail="La génération audio a pris trop de temps. Veuillez réessayer avec un texte plus court.")
+        return JSONResponse(
+            status_code=504,
+            content={"detail": "La génération audio a pris trop de temps. Veuillez réessayer avec un texte plus court."},
+            headers={
+                "Access-Control-Allow-Origin": allow_origin,
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
     except CalledProcessError as e:
         error_msg = e.stderr or e.stdout or str(e)
         logging.error("TTS generation failed: %s", error_msg)
         logging.error("Command: %s", " ".join(cmd))
         return JSONResponse(
             status_code=500,
-            content={"detail": f"La génération audio a échoué: {error_msg[:200]}"}
+            content={"detail": f"La génération audio a échoué: {error_msg[:200]}"},
+            headers={
+                "Access-Control-Allow-Origin": allow_origin,
+                "Access-Control-Allow-Credentials": "true",
+            }
         )
     except Exception as e:
         logging.error("Unexpected error: %s", str(e), exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"detail": f"Erreur inattendue: {str(e)[:200]}"}
+            content={"detail": f"Erreur inattendue: {str(e)[:200]}"},
+            headers={
+                "Access-Control-Allow-Origin": allow_origin,
+                "Access-Control-Allow-Credentials": "true",
+            }
         )
