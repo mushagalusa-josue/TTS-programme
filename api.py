@@ -3,11 +3,13 @@ import os
 import subprocess
 import uuid
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, constr
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.base import BaseHTTPMiddleware
 from subprocess import CalledProcessError, TimeoutExpired
 
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +24,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Middleware pour logger les requêtes
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        logging.info(f"{request.method} {request.url.path} from {request.client.host if request.client else 'unknown'}")
+        response = await call_next(request)
+        logging.info(f"Response: {response.status_code}")
+        return response
+
 # Autoriser le frontend et les domaines de déploiement
 origins = [
     "https://tts-programme.vercel.app",
@@ -31,13 +41,19 @@ origins = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:4173",
 ]
+
+# Configuration CORS - doit être ajouté en premier (dernier dans la liste)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+# Middleware de logging - ajouté après CORS
+app.add_middleware(LoggingMiddleware)
 
 # Servir les fichiers générés
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
@@ -118,5 +134,16 @@ async def generate_tts(request: TTSRequest):
         logging.error("TTS generation timed out after 120 seconds.")
         raise HTTPException(status_code=504, detail="La génération audio a pris trop de temps. Veuillez réessayer avec un texte plus court.")
     except CalledProcessError as e:
-        logging.error("TTS generation failed: %s", e.stderr or e.stdout or str(e))
-        raise HTTPException(status_code=500, detail="La génération audio a échoué.")
+        error_msg = e.stderr or e.stdout or str(e)
+        logging.error("TTS generation failed: %s", error_msg)
+        logging.error("Command: %s", " ".join(cmd))
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"La génération audio a échoué: {error_msg[:200]}"}
+        )
+    except Exception as e:
+        logging.error("Unexpected error: %s", str(e), exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Erreur inattendue: {str(e)[:200]}"}
+        )
