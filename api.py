@@ -136,6 +136,56 @@ async def healthy_check():
     return {"status": "healthy", "service": "kokoro-tts-api"}
 
 
+@app.get("/test-kokoro")
+async def test_kokoro():
+    """Endpoint de test pour vérifier que kokoro fonctionne"""
+    python_cmd = os.environ.get("PYTHON_CMD", "python")
+    test_output = os.path.join(OUTPUT_DIR, "test_kokoro.wav")
+    
+    try:
+        # Test simple avec un texte court
+        cmd = [
+            python_cmd,
+            "-m", "kokoro",
+            "--voice", "ff_siwis",
+            "--text", "test",
+            "--output-file", test_output,
+            "--speed", "1.0"
+        ]
+        
+        logging.info(f"Testing kokoro with command: {' '.join(cmd)}")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=60,  # 60 secondes pour le test
+        )
+        
+        success = result.returncode == 0 and os.path.exists(test_output)
+        
+        return {
+            "kokoro_available": True,
+            "test_successful": success,
+            "return_code": result.returncode,
+            "stdout": result.stdout[:500] if result.stdout else None,
+            "stderr": result.stderr[:500] if result.stderr else None,
+            "output_file_exists": os.path.exists(test_output),
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "kokoro_available": True,
+            "test_successful": False,
+            "error": "Timeout after 60 seconds"
+        }
+    except Exception as e:
+        logging.error(f"Error testing kokoro: {str(e)}", exc_info=True)
+        return {
+            "kokoro_available": False,
+            "test_successful": False,
+            "error": str(e)[:200]
+        }
+
+
 class TTSRequest(BaseModel):
     text: constr(strip_whitespace=True, min_length=1, max_length=500)
 
