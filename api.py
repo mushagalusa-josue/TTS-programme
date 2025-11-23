@@ -27,9 +27,11 @@ app = FastAPI(
 # Middleware pour logger les requêtes
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        logging.info(f"{request.method} {request.url.path} from {request.client.host if request.client else 'unknown'}")
+        origin = request.headers.get("origin", "no origin")
+        logging.info(f"{request.method} {request.url.path} from {request.client.host if request.client else 'unknown'} (origin: {origin})")
         response = await call_next(request)
-        logging.info(f"Response: {response.status_code}")
+        cors_headers = {k: v for k, v in response.headers.items() if k.lower().startswith("access-control")}
+        logging.info(f"Response: {response.status_code}, CORS headers: {cors_headers}")
         return response
 
 # Autoriser le frontend et les domaines de déploiement
@@ -94,8 +96,11 @@ VOICE = "ff_siwis"
 
 @app.post("/tts")
 async def generate_tts(request: TTSRequest):
+    logging.info("POST /tts received - Starting TTS generation")
     text = request.text.strip()
+    logging.info(f"Text received: {text[:50]}... (length: {len(text)})")
     if not text:
+        logging.warning("Empty text received")
         raise HTTPException(status_code=400, detail="Le texte ne peut pas être vide.")
 
     output_file = f"output_{uuid.uuid4().hex}.wav"
