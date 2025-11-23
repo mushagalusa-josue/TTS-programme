@@ -193,17 +193,29 @@ async def generate_tts(request: TTSRequest, http_request: Request):
         "--speed", "1.0"
     ]
 
+    logging.info(f"Executing command: {' '.join(cmd)}")
+    logging.info(f"Output file will be: {output_path}")
+
     try:
         def _run():
-            return subprocess.run(
+            logging.info("Starting kokoro subprocess...")
+            result = subprocess.run(
                 cmd,
                 check=True,
                 capture_output=True,
                 text=True,
                 timeout=120,  # Augmenté à 120 secondes pour la génération TTS
             )
+            logging.info(f"Subprocess completed. Return code: {result.returncode}")
+            if result.stdout:
+                logging.info(f"Subprocess stdout: {result.stdout[:500]}")
+            if result.stderr:
+                logging.warning(f"Subprocess stderr: {result.stderr[:500]}")
+            return result
 
+        logging.info("Running kokoro in threadpool...")
         completed_process = await run_in_threadpool(_run)
+        logging.info("Threadpool execution completed")
         if not os.path.exists(output_path):
             return JSONResponse(
                 status_code=500,
