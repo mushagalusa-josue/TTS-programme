@@ -109,7 +109,24 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Route de santé pour les vérifications de disponibilité"""
-    return {"status": "healthy", "service": "kokoro-tts-api"}
+    # Vérifier si kokoro est accessible
+    python_cmd = os.environ.get("PYTHON_CMD", "python")
+    try:
+        result = subprocess.run(
+            [python_cmd, "-m", "kokoro", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        kokoro_available = result.returncode == 0
+    except:
+        kokoro_available = False
+    
+    return {
+        "status": "healthy",
+        "service": "kokoro-tts-api",
+        "kokoro_available": kokoro_available
+    }
 
 
 @app.get("/healthy")
@@ -199,23 +216,35 @@ async def generate_tts(request: TTSRequest, http_request: Request):
     try:
         def _run():
             logging.info("Starting kokoro subprocess...")
-            result = subprocess.run(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=120,  # Augmenté à 120 secondes pour la génération TTS
-            )
-            logging.info(f"Subprocess completed. Return code: {result.returncode}")
-            if result.stdout:
-                logging.info(f"Subprocess stdout: {result.stdout[:500]}")
-            if result.stderr:
-                logging.warning(f"Subprocess stderr: {result.stderr[:500]}")
-            return result
+            try:
+                result = subprocess.run(
+                    cmd,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,  # 120 secondes pour la génération TTS
+                )
+                logging.info(f"Subprocess completed. Return code: {result.returncode}")
+                if result.stdout:
+                    logging.info(f"Subprocess stdout (first 1000 chars): {result.stdout[:1000]}")
+                if result.stderr:
+                    logging.warning(f"Subprocess stderr (first 1000 chars): {result.stderr[:1000]}")
+                return result
+            except subprocess.TimeoutExpired as e:
+                logging.error(f"kokoro subprocess timed out after 120 seconds")
+                raise
+            except subprocess.CalledProcessError as e:
+                logging.error(f"kokoro subprocess failed with return code {e.returncode}")
+                logging.error(f"stdout: {e.stdout[:1000] if e.stdout else 'None'}")
+                logging.error(f"stderr: {e.stderr[:1000] if e.stderr else 'None'}")
+                raise
+            except Exception as e:
+                logging.error(f"Unexpected error in subprocess: {str(e)}", exc_info=True)
+                raise
 
         logging.info("Running kokoro in threadpool...")
         completed_process = await run_in_threadpool(_run)
-        logging.info("Threadpool execution completed")
+        logging.info("Threadpool execution completed successfully")
         if not os.path.exists(output_path):
             return JSONResponse(
                 status_code=500,
