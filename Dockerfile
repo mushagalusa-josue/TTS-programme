@@ -32,6 +32,9 @@ WORKDIR /app
 COPY --from=builder /root/.local /home/appuser/.local
 COPY --chown=appuser:appuser . .
 
+# Créer le dossier outputs avec les bonnes permissions
+RUN mkdir -p /app/outputs && chown -R appuser:appuser /app/outputs
+
 USER appuser
 
 ENV PATH=/home/appuser/.local/bin:$PATH
