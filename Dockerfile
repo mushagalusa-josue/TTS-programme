@@ -24,13 +24,12 @@ USER appuser
 # Note: Les modèles kokoro seront téléchargés automatiquement au premier usage
 # Cela peut prendre quelques minutes la première fois, mais évite de faire échouer le build
 
-# 8. Exposer le port (Render définit automatiquement PORT, généralement 10000)
-EXPOSE 10000
+# 8. Exposer le port (Railway définit automatiquement PORT)
+EXPOSE 8080
 
 # 9. Démarrer le serveur FastAPI
-# Render définit automatiquement la variable PORT (généralement 10000)
-# Bind sur 0.0.0.0 comme requis par Render
-# Utiliser sh -c pour permettre l'expansion de ${PORT}
-CMD sh -c "echo 'Starting server on port ${PORT:-10000}' && python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}"
+# Railway définit automatiquement la variable PORT
+# Bind sur 0.0.0.0 comme requis
+CMD python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-8080}
 
 
