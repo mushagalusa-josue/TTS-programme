@@ -9,8 +9,16 @@ outputs/
 *.wav
 .git
 .gitignore
-README.md
+README*.md
 .vscode
 .idea
 *.log
+kokoro_front/
+test.wav
+*.md
+!requirements.txt
+.DS_Store
+*.swp
+*.swo
+*~
 
