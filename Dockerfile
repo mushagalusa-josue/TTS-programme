@@ -8,8 +8,13 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-# Installer toutes les dépendances
-# Note: On installe torch depuis PyPI standard pour éviter les problèmes d'index
+# Installer typing-extensions avant torch => corrige le bug
+RUN pip install --no-cache-dir --user typing_extensions==4.12.2
+
+# Installer torch CPU-only (plus léger)
+RUN pip install --no-cache-dir --user torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu
+
+# Installer les autres dépendances
 RUN pip install --no-cache-dir --user -r requirements.txt \
     && find /root/.local -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true \
     && find /root/.local -type f -name "*.pyc" -delete 2>/dev/null || true \
