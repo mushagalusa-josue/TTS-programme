@@ -21,6 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 7. Passer à l'utilisateur non-root après l'installation
 USER appuser
 
+# Note: Les modèles kokoro seront téléchargés automatiquement au premier usage
+# Cela peut prendre quelques minutes la première fois, mais évite de faire échouer le build
+
 # 8. Exposer le port (Render définit automatiquement PORT, généralement 10000)
 EXPOSE 10000
 
