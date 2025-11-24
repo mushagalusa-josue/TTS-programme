@@ -38,6 +38,10 @@ RUN mkdir -p /app/outputs && chown -R appuser:appuser /app/outputs
 USER appuser
 
 ENV PATH=/home/appuser/.local/bin:$PATH
+# Limiter l'utilisation mémoire de PyTorch pour éviter les SIGKILL sur Railway
+ENV PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
 
 EXPOSE 8080
 

@@ -24,11 +24,29 @@ export default function App() {
     }
     catch (error) {
       console.error('Erreur lors de la génération de la synthèse vocale:', error);
-      if (error.response?.status === 404) {
-        alert('Endpoint non trouvé. Vérifiez que l\'URL de l\'API est correcte.');
-      } else {
-        alert('Une erreur est survenue lors de la génération de la synthèse vocale.');
+      let errorMessage = 'Une erreur est survenue lors de la génération de la synthèse vocale.';
+      
+      if (error.response) {
+        // Erreur avec réponse du serveur
+        const status = error.response.status;
+        const detail = error.response.data?.detail || error.response.data?.message || 'Erreur inconnue';
+        
+        if (status === 404) {
+          errorMessage = 'Endpoint non trouvé. Vérifiez que l\'URL de l\'API est correcte.';
+        } else if (status === 500) {
+          errorMessage = `Erreur serveur: ${detail}`;
+        } else if (status === 504) {
+          errorMessage = 'La génération prend trop de temps. Essayez avec un texte plus court.';
+        } else {
+          errorMessage = `Erreur ${status}: ${detail}`;
+        }
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorMessage = 'La requête a pris trop de temps. La première génération peut prendre plusieurs minutes (téléchargement des modèles).';
+      } else if (error.message) {
+        errorMessage = `Erreur: ${error.message}`;
       }
+      
+      alert(errorMessage);
     }
     finally {
       setLoading(false);

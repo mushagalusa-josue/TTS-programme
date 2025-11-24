@@ -27,11 +27,18 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     """Handler de démarrage pour diagnostiquer les problèmes"""
+    # Limiter l'utilisation mémoire de PyTorch pour éviter les SIGKILL sur Railway
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:128")
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("MKL_NUM_THREADS", "1")
+    
     logging.info("=" * 50)
     logging.info("FastAPI application starting...")
     logging.info(f"PORT environment variable: {os.environ.get('PORT', 'not set')}")
     logging.info(f"Output directory: {OUTPUT_DIR}")
     logging.info(f"Output directory exists: {os.path.exists(OUTPUT_DIR)}")
+    logging.info(f"PYTORCH_CUDA_ALLOC_CONF: {os.environ.get('PYTORCH_CUDA_ALLOC_CONF', 'not set')}")
+    logging.info(f"OMP_NUM_THREADS: {os.environ.get('OMP_NUM_THREADS', 'not set')}")
     logging.info("=" * 50)
 
 # Middleware pour logger les requêtes
@@ -85,8 +92,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     ]
     allow_origin = origin if origin in allowed_origins else allowed_origins[0]
     
-    logging.error(f"Global exception: {str(exc)}")
-    logging.error(traceback.format_exc())
+    error_detail = str(exc)
+    error_traceback = traceback.format_exc()
+    logging.error(f"Global exception: {error_detail}")
+    logging.error(error_traceback)
     
     return JSONResponse(
         status_code=500,
@@ -341,9 +350,16 @@ async def generate_tts(request: TTSRequest, http_request: Request):
         error_msg = e.stderr or e.stdout or str(e)
         logging.error("TTS generation failed: %s", error_msg)
         logging.error("Command: %s", " ".join(cmd))
+        
+        # Détecter si c'est un SIGKILL (processus tué par le système)
+        if "SIGKILL" in str(e) or e.returncode == -9:
+            detail_msg = "Le processus a été tué par le système (dépassement de mémoire). Railway free tier a des limites strictes. Essayez avec un texte plus court ou passez à un plan payant."
+        else:
+            detail_msg = f"La génération audio a échoué: {error_msg[:200]}"
+        
         return JSONResponse(
             status_code=500,
-            content={"detail": f"La génération audio a échoué: {error_msg[:200]}"},
+            content={"detail": detail_msg},
             headers={
                 "Access-Control-Allow-Origin": allow_origin,
                 "Access-Control-Allow-Credentials": "true",
