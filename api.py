@@ -24,6 +24,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Handler de démarrage pour diagnostiquer les problèmes"""
+    logging.info("=" * 50)
+    logging.info("FastAPI application starting...")
+    logging.info(f"PORT environment variable: {os.environ.get('PORT', 'not set')}")
+    logging.info(f"Output directory: {OUTPUT_DIR}")
+    logging.info(f"Output directory exists: {os.path.exists(OUTPUT_DIR)}")
+    logging.info("=" * 50)
+
 # Middleware pour logger les requêtes
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
