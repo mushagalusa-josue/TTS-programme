@@ -18,13 +18,11 @@ COPY --chown=appuser:appuser . /app
 # 6. Installer les dépendances Python en tant que root (plus simple et fiable)
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 7. Pré-télécharger les modèles kokoro pour éviter le téléchargement au runtime
-# Cela peut prendre plusieurs minutes mais évite les timeouts en production
-RUN python -m kokoro --voice ff_siwis --text "test" --output-file /tmp/test_model_download.wav --speed 1.0 || true
-RUN rm -f /tmp/test_model_download.wav || true
-
-# 8. Passer à l'utilisateur non-root après l'installation
+# 7. Passer à l'utilisateur non-root après l'installation
 USER appuser
+
+# Note: Les modèles kokoro seront téléchargés automatiquement au premier usage
+# Cela peut prendre quelques minutes la première fois, mais évite de faire échouer le build
 
 # 8. Exposer le port (Render définit automatiquement PORT, généralement 10000)
 EXPOSE 10000
