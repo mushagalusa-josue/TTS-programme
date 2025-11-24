@@ -8,12 +8,12 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-# Installer torch CPU only d'abord (plus léger)
-# Puis installer les autres dépendances (sans torch)
-RUN pip install --no-cache-dir --user torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir --user $(grep -v "^torch" requirements.txt) \
-    && find /root/.local -type d -name __pycache__ -exec rm -r {} + \
-    && find /root/.local -type f -name "*.pyc" -delete
+# Installer toutes les dépendances
+# Note: On installe torch depuis PyPI standard pour éviter les problèmes d'index
+RUN pip install --no-cache-dir --user -r requirements.txt \
+    && find /root/.local -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true \
+    && find /root/.local -type f -name "*.pyc" -delete 2>/dev/null || true \
+    && find /root/.local -type f -name "*.pyo" -delete 2>/dev/null || true
 
 # Runtime stage
 FROM python:3.10-slim
