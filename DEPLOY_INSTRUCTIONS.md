@@ -1,10 +1,10 @@
 # Instructions de déploiement
 
-## 🔧 Configuration Backend (Render)
+## 🔧 Configuration Backend (Railway)
 
-### Étape 1 : Variable d'environnement PORT dans Render
+### Étape 1 : Backend déployé sur Railway
 
-Dans votre service Render (`https://tts-programme.onrender.com`) :
+Votre backend est déployé sur Railway : `https://kokoro-tts-api-production-b52e.up.railway.app`
 
 1. Allez dans **Environment** (ou **Settings** → **Environment Variables**)
 2. Ajoutez ou modifiez :
@@ -26,7 +26,7 @@ Dans votre service Render (`https://tts-programme.onrender.com`) :
    - Output Directory: `dist`
 3. **Ajoutez la variable d'environnement** (Settings → Environment Variables) :
    ```
-   VITE_API_URL = https://tts-programme.onrender.com
+   VITE_API_URL = https://kokoro-tts-api-production-b52e.up.railway.app
    ```
 4. **Déployez** !
 
@@ -39,7 +39,7 @@ Dans votre service Render (`https://tts-programme.onrender.com`) :
    - Publish directory: `kokoro_front/dist`
 3. **Ajoutez la variable d'environnement** (Site settings → Environment variables) :
    ```
-   VITE_API_URL = https://tts-programme.onrender.com
+   VITE_API_URL = https://kokoro-tts-api-production-b52e.up.railway.app
    ```
 4. **Déployez** !
 
@@ -62,8 +62,8 @@ Dans votre service Render (`https://tts-programme.onrender.com`) :
 ## ✅ Vérification
 
 Après déploiement, testez :
-- Backend : `https://tts-programme.onrender.com/` → doit retourner un JSON
-- Backend health : `https://tts-programme.onrender.com/health` → `{"status": "healthy"}`
+- Backend : `https://kokoro-tts-api-production-b52e.up.railway.app/` → doit retourner un JSON
+- Backend health : `https://kokoro-tts-api-production-b52e.up.railway.app/health` → `{"status": "healthy"}`
 - Frontend : doit pouvoir envoyer des requêtes à `/tts`
 
 ## 🐛 Résolution des problèmes
@@ -77,12 +77,12 @@ Après déploiement, testez :
 2. Reconstruisez le frontend : `npm run build`
 3. Videz le cache du navigateur : `Ctrl + Shift + R`
 
-### Le backend ne démarre pas sur Render
+### Le backend ne démarre pas sur Railway
 
 **Cause** : Le port n'est pas correctement configuré.
 
 **Solution** :
-1. Vérifiez que `PORT=10000` est défini dans Render
-2. Vérifiez les logs de déploiement dans Render
-3. Le Dockerfile utilise `${PORT:-10000}`, donc il devrait fonctionner
+1. Railway définit automatiquement la variable `PORT`
+2. Vérifiez les logs de déploiement dans Railway
+3. Le Dockerfile utilise `${PORT}`, donc il devrait fonctionner automatiquement
 

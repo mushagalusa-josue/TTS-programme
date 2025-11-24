@@ -11,11 +11,11 @@ VITE_API_URL=http://localhost:8000
 ```
 
 ### Pour la production (Vercel/Netlify)
-L'URL par défaut est `https://tts-programme.onrender.com`. 
+L'URL par défaut est `https://kokoro-tts-api-production-b52e.up.railway.app`. 
 
 Si vous voulez la changer, ajoutez la variable d'environnement dans votre plateforme de déploiement :
-- **Vercel** : Settings → Environment Variables → Ajoutez `VITE_API_URL` = `https://tts-programme.onrender.com`
-- **Netlify** : Site settings → Environment variables → Ajoutez `VITE_API_URL` = `https://tts-programme.onrender.com`
+- **Vercel** : Settings → Environment Variables → Ajoutez `VITE_API_URL` = `https://kokoro-tts-api-production-b52e.up.railway.app`
+- **Netlify** : Site settings → Environment variables → Ajoutez `VITE_API_URL` = `https://kokoro-tts-api-production-b52e.up.railway.app`
 
 ## Déploiement
 

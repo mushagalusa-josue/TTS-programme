@@ -47,13 +47,11 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 # Autoriser le frontend et les domaines de déploiement
 origins = [
     "https://tts-programme.vercel.app",
-    "https://tts-programme.onrender.com",
+    "https://kokoro-tts-api-production-b52e.up.railway.app",
     "http://localhost:5173",  # Vite dev server
     "http://localhost:4173",  # Vite preview server
     "http://127.0.0.1:5173",
     "http://127.0.0.1:4173",
-    # Railway.app - ajoutez votre URL Railway ici après déploiement
-    # Exemple: "https://your-app.up.railway.app"
 ]
 
 # Configuration CORS - doit être ajouté en premier (dernier dans la liste)
@@ -79,7 +77,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     origin = request.headers.get("origin", "")
     allowed_origins = [
         "https://tts-programme.vercel.app",
-        "https://tts-programme.onrender.com",
+        "https://kokoro-tts-api-production-b52e.up.railway.app",
         "http://localhost:5173",
         "http://localhost:4173",
         "http://127.0.0.1:5173",
@@ -211,7 +209,7 @@ async def options_tts(request: Request):
     # Vérifier si l'origine est autorisée
     allowed_origins = [
         "https://tts-programme.vercel.app",
-        "https://tts-programme.onrender.com",
+        "https://kokoro-tts-api-production-b52e.up.railway.app",
         "http://localhost:5173",
         "http://localhost:4173",
         "http://127.0.0.1:5173",
@@ -238,7 +236,7 @@ async def generate_tts(request: TTSRequest, http_request: Request):
     origin = http_request.headers.get("origin", "")
     allowed_origins = [
         "https://tts-programme.vercel.app",
-        "https://tts-programme.onrender.com",
+        "https://kokoro-tts-api-production-b52e.up.railway.app",
         "http://localhost:5173",
         "http://localhost:4173",
     ]
