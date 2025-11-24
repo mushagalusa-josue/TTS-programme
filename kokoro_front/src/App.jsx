@@ -19,8 +19,8 @@ export default function App() {
     setError('');
     setAudioUrl('');
 
-    // URL de l'API : utilise la variable d'environnement ou l'URL Render par défaut
-    const API_URL = import.meta.env.VITE_API_URL || 'https://tts-programme.onrender.com';
+    // URL de l'API : utilise la variable d'environnement ou l'URL Railway par défaut
+    const API_URL = import.meta.env.VITE_API_URL || 'https://kokoro-tts-api-production-b52e.up.railway.app';
     
     // Debug: vérifier l'URL utilisée (visible dans la console du navigateur)
     console.log("ENV:", import.meta.env);
