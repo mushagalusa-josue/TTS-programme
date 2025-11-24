@@ -42,6 +42,8 @@ origins = [
     "http://localhost:4173",  # Vite preview server
     "http://127.0.0.1:5173",
     "http://127.0.0.1:4173",
+    # Railway.app - ajoutez votre URL Railway ici après déploiement
+    # Exemple: "https://your-app.up.railway.app"
 ]
 
 # Configuration CORS - doit être ajouté en premier (dernier dans la liste)

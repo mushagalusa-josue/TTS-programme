@@ -31,7 +31,7 @@ export default function App() {
       const response = await axios.post(
         `${API_URL}/tts`,
         { text: trimmed },
-        { timeout: 150000 } // 150 secondes (2.5 minutes) pour laisser le temps à la génération
+        { timeout: 300000 } // 5 minutes pour permettre le téléchargement des modèles la première fois
       );
       const filename = response.data.audio_file;
       setAudioUrl(`${API_URL}/${filename}`);
@@ -42,9 +42,11 @@ export default function App() {
       } else if (err.response?.status === 500) {
         setError('Erreur serveur lors de la génération. Veuillez réessayer.');
       } else if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
-        setError('La requête a pris trop de temps. Veuillez réessayer avec un texte plus court.');
+        setError('La requête a pris trop de temps. La première génération peut prendre plusieurs minutes (téléchargement des modèles). Veuillez réessayer.');
+      } else if (err.response?.status === 502) {
+        setError('Le serveur redémarre. Cela peut arriver lors de la première génération (téléchargement des modèles). Veuillez réessayer dans quelques instants.');
       } else {
-        setError('Une erreur est survenue. Merci de réessayer.');
+        setError('Une erreur est survenue. Merci de réessayer. Si c\'est la première génération, cela peut prendre plusieurs minutes.');
       }
     } finally {
       setLoading(false);
@@ -98,7 +100,7 @@ export default function App() {
           {loading ? (
             <>
               <span className="spinner" />
-              Génération en cours...
+              Génération en cours... (peut prendre plusieurs minutes la première fois)
             </>
           ) : (
             <>

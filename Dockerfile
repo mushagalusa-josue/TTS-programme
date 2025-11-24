@@ -1,35 +1,36 @@
-# 1. Image de base Python 3.10 légère
-FROM python:3.10-slim
+# Build stage
+FROM python:3.10-slim as builder
 
-# 2. Installer Git et dépendances système nécessaires
-RUN apt-get update && apt-get install -y git && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 3. Créer un utilisateur non-root pour exécuter l'application
-RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/outputs && \
-    chown -R appuser:appuser /app
-
-# 4. Définir le dossier de travail
 WORKDIR /app
 
-# 5. Copier les fichiers du projet
-COPY --chown=appuser:appuser . /app
+COPY requirements.txt .
 
-# 6. Installer les dépendances Python en tant que root (plus simple et fiable)
-RUN pip install --no-cache-dir -r requirements.txt
+# Installer torch CPU only d'abord (plus léger)
+# Puis installer les autres dépendances (sans torch)
+RUN pip install --no-cache-dir --user torch==2.9.0 --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir --user $(grep -v "^torch" requirements.txt) \
+    && find /root/.local -type d -name __pycache__ -exec rm -r {} + \
+    && find /root/.local -type f -name "*.pyc" -delete
 
-# 7. Passer à l'utilisateur non-root après l'installation
+# Runtime stage
+FROM python:3.10-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 1000 appuser
+WORKDIR /app
+
+COPY --from=builder /root/.local /home/appuser/.local
+COPY --chown=appuser:appuser . .
+
 USER appuser
 
-# Note: Les modèles kokoro seront téléchargés automatiquement au premier usage
-# Cela peut prendre quelques minutes la première fois, mais évite de faire échouer le build
+ENV PATH=/home/appuser/.local/bin:$PATH
 
-# 8. Exposer le port (Render définit automatiquement PORT, généralement 10000)
-EXPOSE 10000
+EXPOSE 8080
 
-# 9. Démarrer le serveur FastAPI
-# Render définit automatiquement la variable PORT (généralement 10000)
-# Bind sur 0.0.0.0 comme requis par Render
-CMD ["sh", "-c", "python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}"]
-
-
+CMD sh -c "python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-8080}"
