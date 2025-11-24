@@ -30,6 +30,7 @@ EXPOSE 10000
 # 9. Démarrer le serveur FastAPI
 # Render définit automatiquement la variable PORT (généralement 10000)
 # Bind sur 0.0.0.0 comme requis par Render
-CMD ["sh", "-c", "python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}"]
+# Utiliser sh -c pour permettre l'expansion de ${PORT}
+CMD sh -c "echo 'Starting server on port ${PORT:-10000}' && python -m uvicorn api:app --host 0.0.0.0 --port ${PORT:-10000}"
 
 
