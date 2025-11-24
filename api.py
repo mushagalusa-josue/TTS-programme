@@ -158,7 +158,7 @@ async def test_kokoro():
             cmd,
             capture_output=True,
             text=True,
-            timeout=60,  # 60 secondes pour le test
+            timeout=300,  # 5 minutes pour permettre le téléchargement des modèles
         )
         
         success = result.returncode == 0 and os.path.exists(test_output)
@@ -272,7 +272,7 @@ async def generate_tts(request: TTSRequest, http_request: Request):
                     check=True,
                     capture_output=True,
                     text=True,
-                    timeout=120,  # 120 secondes pour la génération TTS
+                    timeout=300,  # 5 minutes pour permettre le téléchargement des modèles si nécessaire
                 )
                 logging.info(f"Subprocess completed. Return code: {result.returncode}")
                 if result.stdout:
