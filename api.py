@@ -2,15 +2,28 @@ import logging
 import os
 import subprocess
 import uuid
+from datetime import datetime
+from typing import Optional
+from dotenv import load_dotenv
 
-from fastapi import FastAPI, HTTPException, Request
+# Charger les variables d'environnement depuis .env
+load_dotenv()
+
+from fastapi import FastAPI, HTTPException, Request, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, constr
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, constr, EmailStr
+from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from subprocess import CalledProcessError, TimeoutExpired
+
+# Imports pour l'authentification
+from database import get_db, init_db
+from models import User
+from auth import verify_password, get_password_hash, create_access_token, decode_access_token, validate_password
 
 logging.basicConfig(level=logging.INFO)
 
@@ -39,6 +52,13 @@ async def startup_event():
     logging.info(f"Output directory exists: {os.path.exists(OUTPUT_DIR)}")
     logging.info(f"PYTORCH_CUDA_ALLOC_CONF: {os.environ.get('PYTORCH_CUDA_ALLOC_CONF', 'not set')}")
     logging.info(f"OMP_NUM_THREADS: {os.environ.get('OMP_NUM_THREADS', 'not set')}")
+    
+    # Initialiser la base de données
+    try:
+        init_db()
+    except Exception as e:
+        logging.warning(f"Database initialization failed (might be expected if DB not available): {e}")
+    
     logging.info("=" * 50)
 
 # Middleware pour logger les requêtes
@@ -57,8 +77,10 @@ origins = [
     "https://kokoro-tts-api-production-b52e.up.railway.app",
     "http://localhost:5173",  # Vite dev server
     "http://localhost:4173",  # Vite preview server
+    "http://localhost:8000",  # API locale
     "http://127.0.0.1:5173",
     "http://127.0.0.1:4173",
+    "http://127.0.0.1:8000",  # API locale
 ]
 
 # Configuration CORS - doit être ajouté en premier (dernier dans la liste)
@@ -108,6 +130,215 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Servir les fichiers générés
 app.mount("/outputs", StaticFiles(directory=OUTPUT_DIR), name="outputs")
+
+# ==================== AUTHENTIFICATION ====================
+
+# Security scheme pour JWT
+security = HTTPBearer()
+
+
+# Modèles Pydantic pour l'authentification
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: constr(min_length=8, max_length=100)
+    name: Optional[str] = None
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: dict
+
+
+# Dependency pour obtenir l'utilisateur actuel depuis le token
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Récupérer l'utilisateur actuel depuis le token JWT
+    """
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide ou expiré",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    user_id: int = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utilisateur non trouvé",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Compte utilisateur désactivé"
+        )
+    
+    return user
+
+
+# Route d'inscription
+@app.post("/api/auth/register", response_model=TokenResponse)
+async def register(user_data: UserRegister, db: Session = Depends(get_db)):
+    """
+    Inscription d'un nouvel utilisateur
+    """
+    # Valider la force du mot de passe
+    is_valid, error_message = validate_password(user_data.password)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
+        )
+    
+    # Vérifier si l'email existe déjà
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cet email est déjà utilisé"
+        )
+    
+    # Créer le nouvel utilisateur
+    hashed_password = get_password_hash(user_data.password)
+    new_user = User(
+        email=user_data.email,
+        hashed_password=hashed_password,
+        name=user_data.name,
+        is_active=True,
+        favorite_voices=[],
+        history=[],
+        credits=None,  # Illimité par défaut
+        preferences={}
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # Créer le token JWT
+    access_token = create_access_token(data={"sub": new_user.id})
+    
+    logging.info(f"New user registered: {new_user.email}")
+    
+    return TokenResponse(
+        access_token=access_token,
+        user=new_user.to_dict()
+    )
+
+
+# Route de connexion
+@app.post("/api/auth/login", response_model=TokenResponse)
+async def login(user_data: UserLogin, db: Session = Depends(get_db)):
+    """
+    Connexion d'un utilisateur
+    """
+    # Trouver l'utilisateur
+    user = db.query(User).filter(User.email == user_data.email).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou mot de passe incorrect"
+        )
+    
+    # Vérifier le mot de passe
+    if not verify_password(user_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou mot de passe incorrect"
+        )
+    
+    # Vérifier si le compte est actif
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Compte utilisateur désactivé"
+        )
+    
+    # Mettre à jour la date de dernière connexion
+    user.last_login = datetime.utcnow()
+    db.commit()
+    
+    # Créer le token JWT
+    access_token = create_access_token(data={"sub": user.id})
+    
+    logging.info(f"User logged in: {user.email}")
+    
+    return TokenResponse(
+        access_token=access_token,
+        user=user.to_dict()
+    )
+
+
+# Route pour obtenir les informations de l'utilisateur actuel
+@app.get("/api/auth/me")
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """
+    Obtenir les informations de l'utilisateur actuellement connecté
+    """
+    return current_user.to_dict()
+
+
+# Route pour mettre à jour les préférences utilisateur
+@app.put("/api/auth/preferences")
+async def update_preferences(
+    preferences: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Mettre à jour les préférences de l'utilisateur
+    """
+    current_user.preferences = preferences
+    db.commit()
+    db.refresh(current_user)
+    
+    return {"message": "Préférences mises à jour", "preferences": current_user.preferences}
+
+
+# Route pour ajouter une voix favorite
+@app.post("/api/auth/favorite-voice/{voice_name}")
+async def add_favorite_voice(
+    voice_name: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Ajouter une voix aux favoris
+    """
+    if current_user.favorite_voices is None:
+        current_user.favorite_voices = []
+    
+    if voice_name not in current_user.favorite_voices:
+        current_user.favorite_voices.append(voice_name)
+        db.commit()
+    
+    return {"message": "Voix ajoutée aux favoris", "favorite_voices": current_user.favorite_voices}
+
+
+# ==================== FIN AUTHENTIFICATION ====================
 
 
 @app.get("/")
