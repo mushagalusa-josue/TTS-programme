@@ -11,16 +11,20 @@ logging.basicConfig(level=logging.INFO)
 
 # Récupérer l'URL de la base de données depuis les variables d'environnement
 # Format attendu: postgresql://user:password@host:port/database
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/kokoro_tts"
-)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# Si DATABASE_URL n'est pas définie, utiliser la valeur par défaut (développement local uniquement)
+if not DATABASE_URL:
+    DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/kokoro_tts"
+    logging.warning("DATABASE_URL not set in environment, using default localhost (development only)")
 
 # Si Railway ou autre service utilise postgres:// au lieu de postgresql://
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-logging.info(f"Database URL: {DATABASE_URL.split('@')[0]}@***")  # Ne pas logger le mot de passe
+# Logger l'URL (masquer le mot de passe)
+db_host = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else "unknown"
+logging.info(f"Database URL configured: ***@{db_host}")
 
 # Créer le moteur SQLAlchemy
 # Forcer l'utilisation d'IPv4 si localhost est utilisé

@@ -204,48 +204,59 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     """
     Inscription d'un nouvel utilisateur
     """
-    # Valider la force du mot de passe
-    is_valid, error_message = validate_password(user_data.password)
-    if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_message
+    try:
+        # Valider la force du mot de passe
+        is_valid, error_message = validate_password(user_data.password)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_message
+            )
+        
+        # Vérifier si l'email existe déjà
+        existing_user = db.query(User).filter(User.email == user_data.email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cet email est déjà utilisé"
+            )
+        
+        # Créer le nouvel utilisateur
+        hashed_password = get_password_hash(user_data.password)
+        new_user = User(
+            email=user_data.email,
+            hashed_password=hashed_password,
+            name=user_data.name,
+            is_active=True,
+            favorite_voices=[],
+            history=[],
+            credits=None,  # Illimité par défaut
+            preferences={}
         )
-    
-    # Vérifier si l'email existe déjà
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cet email est déjà utilisé"
+        
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        # Créer le token JWT
+        access_token = create_access_token(data={"sub": new_user.id})
+        
+        logging.info(f"New user registered: {new_user.email}")
+        
+        return TokenResponse(
+            access_token=access_token,
+            user=new_user.to_dict()
         )
-    
-    # Créer le nouvel utilisateur
-    hashed_password = get_password_hash(user_data.password)
-    new_user = User(
-        email=user_data.email,
-        hashed_password=hashed_password,
-        name=user_data.name,
-        is_active=True,
-        favorite_voices=[],
-        history=[],
-        credits=None,  # Illimité par défaut
-        preferences={}
-    )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # Créer le token JWT
-    access_token = create_access_token(data={"sub": new_user.id})
-    
-    logging.info(f"New user registered: {new_user.email}")
-    
-    return TokenResponse(
-        access_token=access_token,
-        user=new_user.to_dict()
-    )
+    except HTTPException:
+        # Re-raise les HTTPException (erreurs de validation)
+        raise
+    except Exception as e:
+        # Logger toutes les autres erreurs pour le débogage
+        logging.error(f"Error during user registration: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de l'inscription: {str(e)}"
+        )
 
 
 # Route de connexion
